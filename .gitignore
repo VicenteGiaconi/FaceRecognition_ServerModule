@@ -1,0 +1,9 @@
+*.csv
+session_summary*
+.vs
+venv/
+.ven
+env/
+.venv
+__pycache__/
+*.pyc
