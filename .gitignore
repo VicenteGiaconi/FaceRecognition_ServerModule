@@ -7,3 +7,6 @@ env/
 .venv
 __pycache__/
 *.pyc
+Videos/
+Videos/*.mp4
+.DS_Store
