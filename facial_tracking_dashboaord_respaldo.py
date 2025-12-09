@@ -79,12 +79,6 @@ class FacialTrackingDashboard:
         self.websocket_server = None
         self.websocket_thread = None
         
-        # Control de videos
-        self.video_control_port = 8766
-        self.available_videos = []
-        self.current_video = ""
-        self.quest_ip = "10.33.8.85"  # IP del Quest Pro
-        
         # Métricas derivadas
         self.attention_score = 0
         self.stress_score = 0
@@ -92,15 +86,13 @@ class FacialTrackingDashboard:
         self.last_blink_time = 0
         
         self.setup_ui()
-        # self.start_websocket_server()
-        self.load_video_list()
+        self.start_websocket_server()
         
     def setup_ui(self):
         # Frame superior - Controles
         control_frame = ttk.Frame(self.root)
         control_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=10)
         
-        # Botones de captura
         self.start_btn = ttk.Button(control_frame, text="▶ Iniciar Captura", 
                                      command=self.start_capture, width=20)
         self.start_btn.pack(side=tk.LEFT, padx=5)
@@ -112,24 +104,6 @@ class FacialTrackingDashboard:
         self.status_label = ttk.Label(control_frame, text="● Desconectado", 
                                        foreground="red", font=("Arial", 12, "bold"))
         self.status_label.pack(side=tk.LEFT, padx=20)
-        
-        # Frame de control de video
-        video_control_frame = ttk.LabelFrame(self.root, text="🎥 Control de Video 360", padding=10)
-        video_control_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=5)
-        
-        ttk.Label(video_control_frame, text="Seleccionar video:").pack(side=tk.LEFT, padx=5)
-        
-        self.video_combo = ttk.Combobox(video_control_frame, state="readonly", width=40)
-        self.video_combo.pack(side=tk.LEFT, padx=5)
-        self.video_combo.bind("<<ComboboxSelected>>", self.on_video_selected)
-        
-        self.refresh_videos_btn = ttk.Button(video_control_frame, text="🔄 Actualizar", 
-                                             command=self.load_video_list)
-        self.refresh_videos_btn.pack(side=tk.LEFT, padx=5)
-        
-        self.current_video_label = ttk.Label(video_control_frame, text="Video actual: --", 
-                                             font=("Arial", 10))
-        self.current_video_label.pack(side=tk.LEFT, padx=20)
         
         # Frame principal - dividido en 3 columnas
         main_frame = ttk.Frame(self.root)
@@ -194,33 +168,24 @@ class FacialTrackingDashboard:
         # Iniciar archivo CSV para guardado local
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"results/full/facial_data_pc_{timestamp}.csv"
-        
-        try:
-            self.csv_file = open(filename, 'w', newline='')
-            self.csv_writer = csv.writer(self.csv_file)
-            self.csv_writer.writerow(['Timestamp', 'Expression_ID', 'Expression_Name', 'Value'])
-        except Exception as e:
-            self.log(f"Error creando archivo CSV: {e}")
-            return
+        self.csv_file = open(filename, 'w', newline='')
+        self.csv_writer = csv.writer(self.csv_file)
+        self.csv_writer.writerow(['Timestamp', 'Expression_ID', 'Expression_Name', 'Value'])
         
         self.is_recording = True
         self.start_btn.config(state=tk.DISABLED)
         self.stop_btn.config(state=tk.NORMAL)
         self.status_label.config(text="● Capturando", foreground="green")
         
-        self.log("=" * 60)
-        self.log("INICIANDO CAPTURA")
-        self.log("=" * 60)
+        self.log("Iniciando captura desde Quest Pro...")
         self.log(f"Guardando datos en: {filename}")
-        self.log("")
         
-        # CRÍTICO: Iniciar thread de ADB logcat para tiempo real
-        self.log("Iniciando conexión ADB para datos en tiempo real...")
+        # Iniciar thread de ADB logcat
         self.adb_thread = threading.Thread(target=self.read_adb_logcat, daemon=True)
         self.adb_thread.start()
         
         # Iniciar actualización de gráficos
-        self.root.after(100, self.update_graphs)
+        self.update_graphs()
         
     def stop_capture(self):
         self.is_recording = False
@@ -261,7 +226,7 @@ class FacialTrackingDashboard:
                         # Extraer JSON
                         json_start = line.index('[FACIAL_DATA]') + len('[FACIAL_DATA]')
                         json_str = line[json_start:].strip()
-                        
+
                         import re
                         # Reemplazar "número,número" por "número.número"
                         json_str = re.sub(r'(\d+),(\d+)', r'\1.\2', json_str)
@@ -271,7 +236,7 @@ class FacialTrackingDashboard:
                         self.process_data(data)
                         
                     except (ValueError, json.JSONDecodeError) as e:
-                        pass  # Ignorar líneas mal formadas
+                        self.log(f"Error parseando JSON: {e}")
                         
         except Exception as e:
             self.log(f"Error en ADB: {str(e)}")
@@ -388,8 +353,6 @@ class FacialTrackingDashboard:
         self.log_text.see(tk.END)
     
     def run(self):
-        self.root.after(1, self.start_websocket_server)
-
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.root.mainloop()
     
@@ -411,8 +374,8 @@ class FacialTrackingDashboard:
                 hostname = socket.gethostname()
                 local_ip = socket.gethostbyname(hostname)
                 
-                self.root.after(0, lambda: self.log(f"Servidor de resumen iniciado en {local_ip}:{self.websocket_port}"))
-                self.root.after(0, lambda: self.log("Configura esta IP en Unity (WebSocketSender)"))
+                self.log(f"Servidor de resumen iniciado en {local_ip}:{self.websocket_port}")
+                self.log("Configura esta IP en Unity (WebSocketSender)")
                 
                 while True:
                     try:
@@ -431,6 +394,9 @@ class FacialTrackingDashboard:
                         
                         # Procesar resumen recibido
                         if data:
+                            # json_data = data.decode('utf-8')
+                            # self.root.after(0, lambda: self.process_session_summary(json_data))
+                            
                             json_data = data.decode('utf-8').strip()
 
                             # Saneamiento (Si el origen es Unity, a menudo usa comillas simples o no cita bien)
@@ -451,12 +417,10 @@ class FacialTrackingDashboard:
                             
                     except Exception as e:
                         if "WinError 10054" not in str(e):  # Ignorar desconexiones normales
-                            # self.log(f"Error en conexión: {e}")
-                            self.root.after(0, lambda: self.log(f"Error en conexión: {e}"))
+                            self.log(f"Error en conexión: {e}")
                         
             except Exception as e:
-                # self.log(f"Error en servidor WebSocket: {e}")
-                self.root.after(0, lambda: self.log(f"Error en servidor WebSocket: {e}"))
+                self.log(f"Error en servidor WebSocket: {e}")
         
         self.websocket_thread = threading.Thread(target=server_thread, daemon=True)
         self.websocket_thread.start()
@@ -499,6 +463,7 @@ class FacialTrackingDashboard:
             
             # Guardar datos raw en CSV
             raw_data = data.get('rawData', [])
+            print(raw_data)
             if raw_data:
                 csv_file = f"results/raw/session_raw_data_{timestamp}.csv"
                 with open(csv_file, 'w', newline='') as f:
@@ -596,95 +561,6 @@ MÉTRICAS PROMEDIO:
         # Botón para cerrar
         ttk.Button(summary_window, text="Cerrar", 
                   command=summary_window.destroy).pack(pady=10)
-    
-    # ========== CONTROL DE VIDEOS ==========
-    
-    def send_command_to_quest(self, command):
-        """Envía un comando al Quest Pro"""
-        try:
-            client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            client.settimeout(5)
-            
-            self.log(f"Conectando a {self.quest_ip}:{self.video_control_port}...")
-            client.connect((self.quest_ip, self.video_control_port))
-            
-            client.sendall(command.encode('utf-8'))
-            
-            response = client.recv(4096).decode('utf-8')
-            client.close()
-            
-            return response
-            
-        except socket.timeout:
-            self.log(f"✗ Timeout conectando al Quest Pro")
-            messagebox.showerror("Error", "No se pudo conectar al Quest Pro.\nVerifica que:\n1. La app esté corriendo\n2. Estén en la misma red WiFi\n3. La IP sea correcta")
-            return None
-        except Exception as e:
-            self.log(f"✗ Error enviando comando: {e}")
-            return None
-    
-    def load_video_list(self):
-        """Carga la lista de videos disponibles desde el Quest Pro"""
-        self.log("Solicitando lista de videos...")
-        
-        response = self.send_command_to_quest("LIST")
-        
-        if response:
-            try:
-                data = json.loads(response)
-                
-                if data.get('status') == 'ok':
-                    self.available_videos = data.get('videos', [])
-                    self.current_video = data.get('current', '')
-                    
-                    # Actualizar combo box
-                    self.video_combo['values'] = self.available_videos
-                    
-                    if self.current_video in self.available_videos:
-                        self.video_combo.set(self.current_video)
-                    
-                    self.current_video_label.config(text=f"Video actual: {self.current_video}")
-                    
-                    self.log(f"✓ {len(self.available_videos)} videos disponibles")
-                else:
-                    self.log(f"✗ Error: {data.get('message', 'Unknown error')}")
-                    
-            except json.JSONDecodeError as e:
-                self.log(f"✗ Error parseando respuesta: {e}")
-    
-    def on_video_selected(self, event=None):
-        """Callback cuando se selecciona un video"""
-        selected = self.video_combo.get()
-        
-        if not selected:
-            return
-        
-        if messagebox.askyesno("Cambiar video", 
-                              f"¿Cambiar al video '{selected}'?"):
-            self.change_video(selected)
-    
-    def change_video(self, video_name):
-        """Cambia el video en el Quest Pro"""
-        self.log(f"Cambiando a video: {video_name}")
-        
-        command = f"PLAY:{video_name}"
-        response = self.send_command_to_quest(command)
-        
-        if response:
-            try:
-                data = json.loads(response)
-                
-                if data.get('status') == 'ok':
-                    self.current_video = video_name
-                    self.current_video_label.config(text=f"Video actual: {video_name}")
-                    self.log(f"✓ Video cambiado exitosamente")
-                    messagebox.showinfo("Éxito", f"Video cambiado a: {video_name}")
-                else:
-                    self.log(f"✗ Error: {data.get('message', 'Unknown error')}")
-                    messagebox.showerror("Error", data.get('message', 'Error cambiando video'))
-                    
-            except json.JSONDecodeError as e:
-                self.log(f"✗ Error parseando respuesta: {e}")
 
 if __name__ == "__main__":
     dashboard = FacialTrackingDashboard()
