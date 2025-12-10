@@ -16,7 +16,7 @@ import socket
 import asyncio
 
 # Configuración de la ruta de ADB - Tu versión de Unity
-ADB_PATH = r'C:\Program Files\Unity\Hub\Editor\6000.0.47f1\Editor\Data\PlaybackEngines\AndroidPlayer\SDK\platform-tools\adb.exe'
+ADB_PATH = '/home/vgiac/Unity/Hub/Editor/6000.0.47f1/Editor/Data/PlaybackEngines/AndroidPlayer/SDK/platform-tools/adb'
 
 # Verificar que ADB existe
 if not os.path.exists(ADB_PATH):
@@ -83,7 +83,7 @@ class FacialTrackingDashboard:
         self.video_control_port = 8766
         self.available_videos = []
         self.current_video = ""
-        self.quest_ip = "10.33.8.85"  # IP del Quest Pro
+        self.quest_ip = "10.33.0.98"  # IP del Quest Pro
         
         # Métricas derivadas
         self.attention_score = 0
