@@ -14,9 +14,14 @@ import os
 import glob
 import socket
 import asyncio
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Configuración de la ruta de ADB - Tu versión de Unity
-ADB_PATH = '/home/vgiac/Unity/Hub/Editor/6000.0.47f1/Editor/Data/PlaybackEngines/AndroidPlayer/SDK/platform-tools/adb'
+# ADB_PATH = '/home/vgiac/Unity/Hub/Editor/6000.0.47f1/Editor/Data/PlaybackEngines/AndroidPlayer/SDK/platform-tools/adb'
+ADB_PATH = os.getenv('ADB_PATH')
+QUEST_IP = os.getenv('QUEST_IP')
 
 # Verificar que ADB existe
 if not os.path.exists(ADB_PATH):
@@ -83,7 +88,7 @@ class FacialTrackingDashboard:
         self.video_control_port = 8766
         self.available_videos = []
         self.current_video = ""
-        self.quest_ip = "10.33.0.98"  # IP del Quest Pro
+        self.quest_ip = "10.33.0.89"  # IP del Quest Pro
         
         # Métricas derivadas
         self.attention_score = 0

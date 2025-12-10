@@ -2,8 +2,8 @@
 session_summary*
 .vs
 venv/
-.ven
-env/
 .venv
+env/
+.env
 __pycache__/
 *.pyc
